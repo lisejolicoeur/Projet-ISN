@@ -1,0 +1,211 @@
+'''
+Le code n'est pas exécutable hors du site CodinGame ; pour le lancer aller sur le lien :
+https://www.codingame.com/ide/puzzle/tron-battle
+'''
+
+import sys
+import math
+""" GitHub: https://github.com/DaSpood/ISN2017 
+-> Tous les fichiers liés au projet, les différents codes testés, etc... """
+#VARIABLES:
+NB_COL = 30
+NB_LIG = 20
+DIRECTIONS = [(1,0),(-1,0),(0,1),(0,-1)]
+NOM_DIRECTIONS = ["RIGHT","LEFT","DOWN","UP"]
+INCONNUE = -999
+tour = 1
+commande = None
+ennemy_dist = 0
+bestMove = None
+
+#FONCTIONS:
+
+def initialiser(caractere=INCONNUE, ligOrigine=None, colOrigine=None): 
+   """
+   Génération des grilles:
+   -représentent la map
+   -chaque case d'une même grille contiennent initialement la même   valeur                                                                                                                                                                                                                                                                                    "caractere", ou 0 si il s'agit d'une base propagation
+   """
+   
+   grilleTemp = [[caractere] * NB_COL for loop in range (NB_LIG)] 
+   
+   if ligOrigine != None and colOrigine != None:
+      grilleTemp[ligOrigine][colOrigine] = 0
+   return grilleTemp
+   
+def propagation(posDepartY, posDepartX, joueur):
+   """
+   Algorithme de remplissage par diffusion/propagation en 4 directions:
+   https://www.codingame.com/servlet/fileservlet?id=7767935916241
+   (le gif montre une version récursive, mais illustre bien les directions utilisées)
+   """
+   global ennemy_dist
+
+   iteration = 1
+   distance = initialiser(INCONNUE, posDepartY, posDepartX)
+   frontiere = [(posDepartY, posDepartX)]
+
+   while len(frontiere) != 0:
+      nouvelleFrontiere = []
+	  
+      for (lig,col) in frontiere:
+	  
+         for (dcol, dlig) in DIRECTIONS:
+		 
+            ligV = lig+dlig
+            colV = col+dcol
+			
+            if 0<=ligV<NB_LIG and 0<=colV<NB_COL:
+               if distance[ligV][colV] == INCONNUE:
+			   
+                  if GRILLE[ligV][colV] == "•":
+				  
+                     if joueur == P:
+                         distance[ligV][colV] = iteration
+						 
+                     else:
+                         distance[ligV][colV] = -iteration
+                         ennemy_dist += iteration
+						 
+                     nouvelleFrontiere.append((ligV,colV))
+					 
+      frontiere = nouvelleFrontiere
+      iteration += 1
+	  
+   return distance
+
+def sommeTab2D(*liste):
+   '''
+   Fait la somme des grilles contenues dans la liste, et compte le nombre de cases plus proches de mon bot (valeur entre -100 et 0) ou de l'adversaire (plus grandes que 0).
+   '''
+   somme = initialiser()
+   num_my_tiles = 0
+   num_ennemy_tiles = 0
+   
+   for lig in range(NB_LIG):
+      for col in range(NB_COL):
+	  
+         somme[lig][col] = sum(t[lig][col] for t in liste)
+		 
+         if somme[lig][col] < 0 and somme[lig][col] > -100:
+            num_my_tiles += 1
+			
+         elif somme[lig][col] >= 0:
+            num_ennemy_tiles += 1
+			
+   return somme, num_my_tiles, num_ennemy_tiles
+
+def scoreMVT (currY, currX):
+	'''
+	Fonction d'évaluation des coups.
+	But:
+	-La fonction prend pour argment les positions actelles de notre bot
+	-Elle simule la situation de tours suivant pour chaque mouvement possible (haut/bas/droite/gauche):
+	-Elle demande une grille de propagation de tous les bots au tour suivant
+	-Elle demande la somme de ces propagations, le nombre de cases proches proches de notre bot, et le nombre de cases proches des adversaires
+	-Elle done un score à chaque mouvement: plus notre bot a de cases proches, plus le score est haut
+	-Si le score du mouvement testé est plus haut que le précédent, il devient mouvement favoris et sera joué si aucune meilleure option n'est trouvée 
+	'''
+   global ennemy_dist, num_ennemy_tiles, num_my_tiles, bestMove
+   score = 0
+   propa_joueurs = []
+   liste_propa = []
+
+   for (dCol, dLig),nom in zip(DIRECTIONS,NOM_DIRECTIONS):
+      ligVoisine=currY+dLig
+      colVoisine=currX+dCol
+
+      if 0<=ligVoisine<NB_LIG and 0<=colVoisine<NB_COL:
+	  
+         for i in range (N):
+            DynaY,DynaX = PositionsDynamiques[i]
+			
+            if i == P:
+              propa_joueurs.append(propagation(ligVoisine,colVoisine,i))
+			  
+            else:
+              propa_joueurs.append(propagation(DynaY, DynaX,i))
+			  
+            liste_propa.append(propa_joueurs[i])
+			
+        somme, num_my_tiles, num_ennemy_tiles = sommeTab2D(*liste_propa)
+
+        newScore = sum([num_my_tiles * 10000000, num_ennemy_tiles * -100000, ennemy_dist])
+		
+        if newScore > score and GRILLE[ligVoisine][colVoisine] == "•":
+		
+           score = newScore
+           bestMove = nom
+		   
+   return bestMove
+
+############################################################################################
+
+#JEU:
+
+GRILLE = initialiser("•")
+
+while True:
+
+   #INITIALISATION DU JEU:
+   N, P = [int(i) for i in input().split()]
+
+   #INITIALISATION DES TABLEAUX DE STATUT DE JOUEURS:
+   if tour==1: 
+      PositionsInitiales = [(None,None)]*N
+      PositionsDynamiques = [(None,None)]*N
+      IsAlive = [True]*N
+      IsAlreadyRemoved = [False]*N
+
+   #INITIALISATION DES AUTRES VARIABLES DE JOUEURS ; REMPLISSAGE DES  TABLEAUX:
+
+   for i in range(N):
+      X0, Y0, X1, Y1 = [int(j) for j in input().split()]
+
+      if X0==-1 or X1==-1 or Y0==-1 or Y1==-1:
+         IsAlive[i] = False
+
+      if tour==1:
+         PositionsInitiales[i] = (Y0,X0)
+         GRILLE[Y0][X0] = str(i)
+
+      if i == P:
+         PX = X1
+         PY = Y1
+
+      if IsAlive[i] == True:
+	  
+         PositionsDynamiques[i] = (Y1,X1)
+         GRILLE[Y1][X1] = str(i)
+		 
+      elif AlreadyRemoved[i] == False: 
+         for col in range(NB_COL):
+            for lig in range (NB-LIG):
+			
+               if GRILLE[lig][col] == str(i):
+                  GRILLE[lig][col] = "•"
+				  
+         AlreadyRemoved[i] =True
+
+   #CHOIX DE LA DIRECTION:
+   commande = scoreMVT(PY, PX)
+
+   #DEBUG: ' print("Debug messages...", file=sys.stderr) '
+	'''
+	Cette sortie d'erreur affiche la grille "GRILLE" qui représente la carte du jeu:
+	-Si un joueur a visité une case, cette case prend la valeur de l'identifiant du joueur (son numéro dans l'ordre de jeu)
+	-Si une case est vide, elle est représentée par un point
+	Cette fonction permet de vérifier que le programme prend bien en compte l'état des cases, et d'identifier certains bgs, notamment de collision.
+	'''
+   for ligne in GRILLE:
+      print("".join(ligne), file=sys.stderr)
+      print("", file=sys.stderr)
+      print("Notre num de joueur: {} ({})".format(P, P+1), file=sys.stderr)
+   for i in range(N):
+      print("Joueur {}: {}".format(i, PositionsDynamiques[i]), file=sys.stderr)
+
+   #ACTION:
+
+   print(commande)
+   tour += 1
+   ennemy_dist = 0
